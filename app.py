@@ -22,6 +22,11 @@ def initialize_game():
         st.session_state.winner = None
     if 'moves_count' not in st.session_state:
         st.session_state.moves_count = 0
+    # Player names initialization
+    if 'player_x_name' not in st.session_state:
+        st.session_state.player_x_name = 'Player X'
+    if 'player_o_name' not in st.session_state:
+        st.session_state.player_o_name = 'Player O'
 
 def check_winner(board: np.ndarray) -> Optional[str]:
     """Check if there's a winner on the board"""
@@ -72,6 +77,78 @@ def reset_game():
     st.session_state.game_over = False
     st.session_state.winner = None
     st.session_state.moves_count = 0
+
+def get_player_name(symbol: str) -> str:
+    """Get player name based on symbol"""
+    return st.session_state.player_x_name if symbol == 'X' else st.session_state.player_o_name
+
+def get_current_player_name() -> str:
+    """Get current player's name based on turn"""
+    return get_player_name(st.session_state.current_player)
+
+def setup_players():
+    """Handle player name input and validation"""
+    st.markdown("### 👥 Player Setup")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        temp_x_name = st.text_input(
+            "Player 1 Name (X)",
+            value=st.session_state.player_x_name if st.session_state.player_x_name != 'Player X' else '',
+            placeholder="Enter Player 1 Name",
+            key="input_player_x"
+        )
+    
+    with col2:
+        temp_o_name = st.text_input(
+            "Player 2 Name (O)",
+            value=st.session_state.player_o_name if st.session_state.player_o_name != 'Player O' else '',
+            placeholder="Enter Player 2 Name",
+            key="input_player_o"
+        )
+    
+    # Validation and confirmation
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
+    
+    with col_btn1:
+        if st.button("✅ Set Names", key="set_names"):
+            # Validation
+            x_name = temp_x_name.strip() if temp_x_name.strip() else 'Player X'
+            o_name = temp_o_name.strip() if temp_o_name.strip() else 'Player O'
+            
+            # Check for identical names
+            if x_name.lower() == o_name.lower() and x_name != 'Player X':
+                st.error("❌ Player names cannot be identical!")
+                return False
+            
+            # Check for very long names
+            if len(x_name) > 20 or len(o_name) > 20:
+                st.error("❌ Player names must be 20 characters or less!")
+                return False
+            
+            # Set names
+            st.session_state.player_x_name = x_name
+            st.session_state.player_o_name = o_name
+            st.success(f"✅ Players set: {x_name} vs {o_name}")
+            st.rerun()
+    
+    with col_btn2:
+        if st.button("🔄 Reset Names", key="reset_names"):
+            st.session_state.player_x_name = 'Player X'
+            st.session_state.player_o_name = 'Player O'
+            st.rerun()
+    
+    with col_btn3:
+        if st.button("🎮 Start Game", key="start_game"):
+            # Set names if they were entered
+            if temp_x_name.strip():
+                st.session_state.player_x_name = temp_x_name.strip()
+            if temp_o_name.strip():
+                st.session_state.player_o_name = temp_o_name.strip()
+            st.rerun()
+    
+    return True
 
 def get_winning_cells() -> List[Tuple[int, int]]:
     """Get the positions of winning cells"""
@@ -204,11 +281,14 @@ def create_game_board():
                 # Set up help text
                 help_text = None
                 if not st.session_state.game_over and is_empty:
-                    help_text = f"Place {st.session_state.current_player} here"
+                    current_player_name = get_current_player_name()
+                    help_text = f"Click here, {current_player_name}! Place {st.session_state.current_player}"
                 elif is_winning:
-                    help_text = f"Winning move by {st.session_state.winner}!"
+                    winner_name = get_player_name(st.session_state.winner)
+                    help_text = f"Winning move by {winner_name}!"
                 elif not is_empty:
-                    help_text = f"Cell occupied by {cell_value}"
+                    cell_player_name = get_player_name(cell_value)
+                    help_text = f"Cell occupied by {cell_player_name}"
                 
                 # Create the button
                 if st.button(
@@ -271,6 +351,11 @@ def main():
     
     st.markdown('<h1 class="main-title">🎮 Tic-Tac-Toe Game</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle">Challenge a friend to the classic strategy game!</p>', unsafe_allow_html=True)
+    
+    # Player setup section (collapsible)
+    with st.expander("👥 Player Setup", expanded=False):
+        setup_players()
+    
     st.markdown("---")
     
     # Game status
@@ -278,12 +363,14 @@ def main():
     
     with col1:
         if not st.session_state.game_over:
-            st.info(f"Current Player: **{st.session_state.current_player}**")
+            current_player_name = get_current_player_name()
+            st.info(f"Current Player: **{current_player_name} ({st.session_state.current_player})**")
         else:
             if st.session_state.winner == 'Tie':
                 st.warning("**It's a Tie!** 🤝")
             else:
-                st.success(f"**Player {st.session_state.winner} Wins!** 🎉")
+                winner_name = get_player_name(st.session_state.winner)
+                st.success(f"**{winner_name} Wins!** 🎉")
     
     with col2:
         st.metric("Moves", st.session_state.moves_count)
@@ -324,11 +411,13 @@ def main():
         col1, col2, col3 = st.columns(3)
         with col1:
             x_count = np.count_nonzero(st.session_state.board == 'X')
-            st.metric("X Moves", x_count)
+            x_player_name = get_player_name('X')
+            st.metric(f"{x_player_name} (X) Moves", x_count)
         
         with col2:
             o_count = np.count_nonzero(st.session_state.board == 'O')
-            st.metric("O Moves", o_count)
+            o_player_name = get_player_name('O')
+            st.metric(f"{o_player_name} (O) Moves", o_count)
         
         with col3:
             empty_count = np.count_nonzero(st.session_state.board == '')
